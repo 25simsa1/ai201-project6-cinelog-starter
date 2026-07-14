@@ -83,6 +83,8 @@ class WatchlistEntry(db.Model):
     date_added = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     public = db.Column(db.Boolean, default=True)
 
+    film = db.relationship("Film", backref="watchlist_entries", lazy=True)
+
     def to_dict(self):
         return {
             "id": self.id,
