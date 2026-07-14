@@ -163,24 +163,34 @@ def test_remove_from_watchlist_nonexistent_raises(app, sample_user, sample_film)
             remove_from_watchlist(user_id=sample_user, film_id=sample_film)
 
 
-# ── get_watchlist (join + sort order) ────────────────────────────────────────
+# ── get_watchlist (film join + sort order) ───────────────────────────────────
 
-def test_get_watchlist_returns_film_dicts_sorted_by_title(app, sample_user):
+def test_get_watchlist_returns_newest_first(app, sample_user):
     """
-    get_watchlist() should join through to Film (exercising the film
-    relationship) and return film dicts sorted alphabetically by title.
+    get_watchlist() should dereference the film relationship and return film
+    dicts sorted by date_added descending (newest first), matching
+    get_collection (see Comment 5).
     """
     with app.app_context():
-        zebra = Film(title="Zodiac", year=2007, genre="Thriller")
-        apple = Film(title="Amelie", year=2001, genre="Romance")
-        db.session.add_all([zebra, apple])
+        from datetime import datetime, timezone, timedelta
+
+        older = Film(title="Amelie", year=2001, genre="Romance")
+        newer = Film(title="Zodiac", year=2007, genre="Thriller")
+        db.session.add_all([older, newer])
         db.session.commit()
 
-        add_to_watchlist(user_id=sample_user, film_id=zebra.id)
-        add_to_watchlist(user_id=sample_user, film_id=apple.id)
+        earlier = datetime.now(timezone.utc) - timedelta(days=5)
+        later = datetime.now(timezone.utc)
+
+        db.session.add_all([
+            WatchlistEntry(user_id=sample_user, film_id=older.id, date_added=earlier),
+            WatchlistEntry(user_id=sample_user, film_id=newer.id, date_added=later),
+        ])
+        db.session.commit()
 
         watchlist = get_watchlist(sample_user)
         titles = [f["title"] for f in watchlist]
 
-        assert titles == ["Amelie", "Zodiac"]
+        # Zodiac was added later, so it should come first.
+        assert titles == ["Zodiac", "Amelie"]
         assert "public" in watchlist[0] and "date_added" in watchlist[0]
